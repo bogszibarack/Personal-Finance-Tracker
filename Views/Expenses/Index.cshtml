@@ -1,0 +1,170 @@
+@model IEnumerable<WebApplication1.Models.Expense>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-primary border-bottom border-3 pb-2">Pénzügyi Dashboard</h2>
+        <a asp-action="Create" class="btn btn-success shadow-sm px-4">
+            <i class="bi bi-plus-lg"></i> + Új kiadás
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0 bg-light">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label class="fw-bold text-muted">Időszak:</label>
+                </div>
+                <div class="col-auto">
+                    <select name="month" class="form-select" onchange="this.form.submit()">
+                        @for (int i = 1; i <= 12; i++)
+                        {
+                            <option value="@i" selected="@(ViewBag.SelectedMonth == i)">
+                                @(System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i))
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <select name="year" class="form-select" onchange="this.form.submit()">
+                        <option value="2025" selected="@(ViewBag.SelectedYear == 2025)">2025</option>
+                        <option value="2026" selected="@(ViewBag.SelectedYear == 2026)">2026</option>
+                    </select>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a asp-action="ExportToCsv" 
+                       asp-route-month="@ViewBag.SelectedMonth" 
+                       asp-route-year="@ViewBag.SelectedYear" 
+                       class="btn btn-outline-dark shadow-sm">
+                        💾 CSV Mentése
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-5">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-bold text-secondary">Kategóriák</span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary active" onclick="toggleCategory('month', this)">Hónap</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="toggleCategory('day', this)">Mai nap</button>
+                    </div>
+                </div>
+                <div class="card-body" style="min-height: 300px;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-bold text-secondary">Időbeli trend</span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary active" onclick="toggleTime('day', this)">Napi</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="toggleTime('month', this)">Havi</button>
+                    </div>
+                </div>
+                <div class="card-body" style="min-height: 300px;">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-bold">Tranzakciók listája</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light text-secondary">
+                    <tr>
+                        <th class="ps-4">Megnevezés</th>
+                        <th>Kategória</th>
+                        <th>Dátum</th>
+                        <th class="text-end pe-4">Összeg</th>
+                        <th class="text-center">Műveletek</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model) {
+                        <tr>
+                            <td class="ps-4 fw-bold">@item.Description</td>
+                            <td><span class="badge rounded-pill bg-info text-dark">@item.Category</span></td>
+                            <td>@item.CreatedAt.ToString("yyyy.MM.dd.")</td>
+                            <td class="text-end pe-4 fw-bold text-danger">@item.Amount.ToString("N0") Ft</td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary">Szerkesztés</a>
+                                    <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Biztosan törlöd?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Törlés</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // ADATOK ELŐKÉSZÍTÉSE
+        @{
+            var catMonth = Model.GroupBy(e => e.Category.ToString()).Select(g => new { n = g.Key, a = g.Sum(e => e.Amount) }).ToList();
+            var today = DateTime.Now.Date;
+            var catDay = Model.Where(e => e.CreatedAt.Date == today).GroupBy(e => e.Category.ToString()).Select(g => new { n = g.Key, a = g.Sum(e => e.Amount) }).ToList();
+            var timeDaily = Model.GroupBy(e => e.CreatedAt.Day).OrderBy(g => g.Key).Select(g => new { l = g.Key + ". nap", a = g.Sum(e => e.Amount) }).ToList();
+            var timeMonthly = Model.GroupBy(e => e.CreatedAt.Month).OrderBy(g => g.Key).Select(g => new { l = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(g.Key), a = g.Sum(e => e.Amount) }).ToList();
+        }
+
+        const dataSets = {
+            cat: {
+                month: { labels: @Html.Raw(Json.Serialize(catMonth.Select(x => x.n))), values: @Html.Raw(Json.Serialize(catMonth.Select(x => x.a))) },
+                day: { labels: @Html.Raw(Json.Serialize(catDay.Select(x => x.n))), values: @Html.Raw(Json.Serialize(catDay.Select(x => x.a))) }
+            },
+            time: {
+                day: { labels: @Html.Raw(Json.Serialize(timeDaily.Select(x => x.l))), values: @Html.Raw(Json.Serialize(timeDaily.Select(x => x.a))) },
+                month: { labels: @Html.Raw(Json.Serialize(timeMonthly.Select(x => x.l))), values: @Html.Raw(Json.Serialize(timeMonthly.Select(x => x.a))) }
+            }
+        };
+
+        let categoryChart = new Chart(document.getElementById('categoryChart'), {
+            type: 'doughnut',
+            data: { labels: dataSets.cat.month.labels, datasets: [{ data: dataSets.cat.month.values, backgroundColor: ['#00d2ff', '#3a7bd5', '#ff6b6b', '#feca57', '#1dd1a1'] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        let timeChart = new Chart(document.getElementById('timeChart'), {
+            type: 'bar',
+            data: { labels: dataSets.time.day.labels, datasets: [{ label: 'Ft', data: dataSets.time.day.values, backgroundColor: '#4e73df', borderRadius: 5 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
+
+        function toggleCategory(mode, btn) {
+            categoryChart.data.labels = dataSets.cat[mode].labels;
+            categoryChart.data.datasets[0].data = dataSets.cat[mode].values;
+            categoryChart.update();
+            updateUI(btn);
+        }
+
+        function toggleTime(mode, btn) {
+            timeChart.data.labels = dataSets.time[mode].labels;
+            timeChart.data.datasets[0].data = dataSets.time[mode].values;
+            timeChart.update();
+            updateUI(btn);
+        }
+
+        function updateUI(btn) {
+            btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+    </script>
+}
