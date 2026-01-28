@@ -15,7 +15,6 @@ public class ExpensesController : Controller
         _context = context;
     }
 
-    // CSAK EZ AZ EGY INDEX MARADJON!
     public async Task<IActionResult> Index(int? month, int? year)
     {
         var currentMonth = month ?? DateTime.Now.Month;
@@ -50,7 +49,7 @@ public class ExpensesController : Controller
         return File(buffer, "text/csv", $"kiadasok_{year}_{month}.csv");
     }
 
-    // --- A többi metódus (Create, Edit, Delete) változatlan marad ---
+    // --- CRUD ---
     public IActionResult Create() => View();
 
     [HttpPost]
