@@ -17,7 +17,7 @@ public class HomeController : Controller
     {
         var currentYear = DateTime.Now.Year;
 
-        // Lekérjük az idei év adatait negyedévekre bontva
+        // Adatok lekérése
         var yearlyData = await _context.Expenses
             .Where(e => e.CreatedAt.Year == currentYear)
             .GroupBy(e => (e.CreatedAt.Month - 1) / 3) // Negyedévek kiszámítása (0, 1, 2, 3)
@@ -39,4 +39,5 @@ public class HomeController : Controller
 
         return View();
     }
+
 }
