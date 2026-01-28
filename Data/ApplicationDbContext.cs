@@ -10,6 +10,6 @@ public class ApplicationDbContext : DbContext
     {
     }
 
-    // Ez a tábla fogja tárolni a kiadásokat az adatbázisban
+    // Tábla adatbázishoz
     public DbSet<Expense> Expenses { get; set; }
 }
